@@ -50,7 +50,7 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
             const Text('Service', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              value: selectedService,
+              initialValue: selectedService,
               dropdownColor: colors.surface,
               decoration: _fieldDecoration(colors),
               iconEnabledColor: colors.primary,
@@ -68,7 +68,7 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
             const Text('Date', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              value: selectedDate,
+              initialValue: selectedDate,
               dropdownColor: colors.surface,
               decoration: _fieldDecoration(colors),
               iconEnabledColor: colors.primary,

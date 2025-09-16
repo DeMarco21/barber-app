@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "529410369995",
+    "project_id": "barber-9133c",
+    "storage_bucket": "barber-9133c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:529410369995:android:ece4317fcccaf7556a2e4e",
+        "android_client_info": {
+          "package_name": "com.example.barber"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "529410369995-anbh0fen0u3rcr2q75km3dd3d1hgfq1m.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.barber",
+            "certificate_hash": "d0bd0da330738236d4e2cf202d6d2c7ae2f65990"
+          }
+        },
+        {
+          "client_id": "529410369995-dmjgrd25mmc6utmouhuvqkhkejt6vg01.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD2B5pxU4_lT5CxPcF0B_dTFS7aFvlU6FY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "529410369995-dmjgrd25mmc6utmouhuvqkhkejt6vg01.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "529410369995-deage804olk1c7vkfrohvp7c73dtn8gq.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.barber"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

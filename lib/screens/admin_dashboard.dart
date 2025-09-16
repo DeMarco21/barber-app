@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:barber/screens/client_dashboard_screen.dart';
+import 'client_dashboard.dart';
 
-class AdminDashboardScreen extends StatefulWidget {
+class AdminDashboard extends StatefulWidget {
   final List<Map<String, String>> barbers;
-  const AdminDashboardScreen({super.key, required this.barbers});
+  const AdminDashboard({
+    super.key,
+    this.barbers = const [], // ✅ default empty list
+  });
+
+
 
   @override
-  State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
+  State<AdminDashboard> createState() => _AdminDashboardScreenState();
 }
 
-class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
+class _AdminDashboardScreenState extends State<AdminDashboard> {
   String? selectedBarberFilter;
   String? selectedStatusFilter; // "upcoming", "completed", "cancelled"
   DateTime? selectedDateFilter;
@@ -41,9 +46,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final filteredAppointments = appointments.where((appt) {
       bool matches = true;
       if (selectedBarberFilter != null &&
-          appt['barber'] != selectedBarberFilter) matches = false;
+          appt['barber'] != selectedBarberFilter) {
+        matches = false;
+      }
       if (selectedStatusFilter != null &&
-          appt['status'] != selectedStatusFilter) matches = false;
+          appt['status'] != selectedStatusFilter) {
+        matches = false;
+      }
       if (selectedDateFilter != null) {
         matches = matches &&
             appt['date'].year == selectedDateFilter!.year &&
@@ -67,7 +76,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => ClientDashboardScreen(barbers: widget.barbers),
+                  builder: (_) => const ClientDashboard(),
                 ),
               );
 
@@ -112,7 +121,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           child: DropdownButtonFormField<String>(
             dropdownColor: const Color(0xFF1C1C1C),
             decoration: _filterDecoration("Barber"),
-            value: selectedBarberFilter,
+            initialValue: selectedBarberFilter,
             items: [
               const DropdownMenuItem(
                 value: null,
@@ -136,7 +145,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           child: DropdownButtonFormField<String>(
             dropdownColor: const Color(0xFF1C1C1C),
             decoration: _filterDecoration("Status"),
-            value: selectedStatusFilter,
+            initialValue: selectedStatusFilter,
             items: const [
               DropdownMenuItem(
                 value: null,

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
 class LogoWidget extends StatelessWidget {
-  const LogoWidget({super.key});
+  final double size;
+  const LogoWidget({super.key, this.size = 80.0});
 
   @override
   Widget build(BuildContext context) {
@@ -20,14 +21,14 @@ class LogoWidget extends StatelessWidget {
             ),
             boxShadow: [
               BoxShadow(
-                color: colors.primary.withValues(alpha: 0.25),
+                color: colors.primary.withOpacity(0.25),
                 blurRadius: 18,
                 spreadRadius: 2,
                 offset: const Offset(0, 8),
               ),
             ],
           ),
-          child: const Icon(Icons.cut, size: 64, color: Colors.white),
+          child: Icon(Icons.cut, size: size, color: Colors.white),
         ),
         const SizedBox(height: 16),
         Text(

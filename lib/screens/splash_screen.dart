@@ -1,6 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'dashboard_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+import 'login_screen.dart';
+import 'admin_dashboard.dart';
+import 'barber_dashboard.dart';
+import 'client_dashboard.dart';
 import '../widgets/logo_widget.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -25,20 +31,65 @@ class _SplashScreenState extends State<SplashScreen>
     _fade = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
     _controller.forward();
 
-    Timer(const Duration(seconds: 2), () {
-      if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => AdminDashboardScreen(
-            barbers: [
-              {"name": "Marcus Bailey", "specialty": "Fade Master"},
-              {"name": "Shane Morgan", "specialty": "Beard Specialist"},
-            ],
-          ),
-        ),
+    // Wait for animation, then decide where to go
+    Timer(const Duration(seconds: 2), _checkAuthAndNavigate);
+  }
 
-      );
-    });
+  Future<void> _checkAuthAndNavigate() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+
+      if (!mounted) return;
+
+      if (user == null) {
+        // No one logged in → go to login screen
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+        );
+        return;
+      }
+
+      // Logged in → fetch role from Firestore
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      final role = doc.data()?['role'] ?? 'client';
+
+      if (!mounted) return;
+
+      switch (role) {
+        case 'admin':
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => const AdminDashboard(
+                barbers: [
+                  {"name": "Marcus Bailey", "specialty": "Fade Master"},
+                  {"name": "Shane Morgan", "specialty": "Beard Specialist"},
+                ],
+              ),
+            ),
+          );
+          break;
+        case 'barber':
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const BarberDashboard()),
+          );
+          break;
+        default:
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const ClientDashboard()),
+          );
+      }
+    } catch (e) {
+      // If there's an error, default to the login screen
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+        );
+      }
+    }
   }
 
   @override
@@ -55,8 +106,8 @@ class _SplashScreenState extends State<SplashScreen>
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              colors.primary.withValues(alpha: 0.12),
-              colors.primaryContainer.withValues(alpha: 0.28),
+              colors.primary.withOpacity(0.12),
+              colors.primaryContainer.withOpacity(0.28),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
