@@ -1,43 +1,52 @@
+
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class LogoWidget extends StatelessWidget {
   final double size;
-  const LogoWidget({super.key, this.size = 80.0});
+  const LogoWidget({super.key, this.size = 100.0});
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    // Define the gold gradient
+    const goldGradient = LinearGradient(
+      colors: [
+        Color(0xFFE4B740), // Brighter Gold
+        Color(0xFFC98633), // Deeper Amber
+        Color(0xFFE4B740),
+        Color(0xFFFFD700), // Shinier Gold
+      ],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      stops: [0.0, 0.4, 0.6, 1.0],
+    );
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              colors: [colors.primary, colors.secondary],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: colors.primary.withOpacity(0.25),
-                blurRadius: 18,
-                spreadRadius: 2,
-                offset: const Offset(0, 8),
-              ),
-            ],
+        // Apply the gradient to the Icon
+        ShaderMask(
+          blendMode: BlendMode.srcIn,
+          shaderCallback: (bounds) => goldGradient.createShader(
+            Rect.fromLTWH(0, 0, bounds.width, bounds.height),
           ),
-          child: Icon(Icons.cut, size: size, color: Colors.white),
+          child: Icon(Icons.cut_sharp, size: size, color: Colors.white),
         ),
-        const SizedBox(height: 16),
-        Text(
-          'TrimCraft',
-          style: TextStyle(
-            fontSize: 26,
-            fontWeight: FontWeight.w800,
-            color: colors.primary,
-            letterSpacing: 0.5,
+        const SizedBox(height: 12),
+        // Apply the gradient to the Text
+        ShaderMask(
+          blendMode: BlendMode.srcIn,
+          shaderCallback: (bounds) => goldGradient.createShader(
+            Rect.fromLTWH(0, 0, bounds.width, bounds.height),
+          ),
+          child: Text(
+            'TrimCraft',
+            style: GoogleFonts.cinzel(
+              fontSize: 32,
+              fontWeight: FontWeight.w700,
+              color: Colors.white, // This color is masked by the shader
+              letterSpacing: 1.5,
+            ),
           ),
         ),
       ],

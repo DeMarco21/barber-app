@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:animated_background/animated_background.dart';
 
 import 'login_screen.dart';
 import 'admin_dashboard.dart';
@@ -17,26 +18,29 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _controller;
-  late final Animation<double> _fade;
+  late final Animation<double> _animation;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
+      duration: const Duration(milliseconds: 1500),
     );
-    _fade = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
+    _animation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOutCubic,
+    );
     _controller.forward();
 
-    // Wait for animation, then decide where to go
-    Timer(const Duration(seconds: 2), _checkAuthAndNavigate);
+    Timer(const Duration(seconds: 3), _checkAuthAndNavigate);
   }
 
   Future<void> _checkAuthAndNavigate() async {
-    try {
+    // Navigation logic remains the same
+     try {
       final user = FirebaseAuth.instance.currentUser;
 
       if (!mounted) return;
@@ -63,12 +67,7 @@ class _SplashScreenState extends State<SplashScreen>
         case 'admin':
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
-              builder: (_) => const AdminDashboard(
-                barbers: [
-                  {"name": "Marcus Bailey", "specialty": "Fade Master"},
-                  {"name": "Shane Morgan", "specialty": "Beard Specialist"},
-                ],
-              ),
+              builder: (_) => const AdminDashboard(),
             ),
           );
           break;
@@ -79,7 +78,7 @@ class _SplashScreenState extends State<SplashScreen>
           break;
         default:
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const ClientDashboard()),
+            MaterialPageRoute(builder: (_) => ClientDashboard()),
           );
       }
     } catch (e) {
@@ -100,23 +99,31 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              colors.primary.withOpacity(0.12),
-              colors.primaryContainer.withOpacity(0.28),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+      backgroundColor: Colors.black,
+      body: AnimatedBackground(
+        behaviour: RandomParticleBehaviour(
+          options: const ParticleOptions(
+            baseColor: Color(0xFFC98633), // Gold
+            spawnOpacity: 0.0,
+            opacityChangeRate: 0.25,
+            minOpacity: 0.1,
+            maxOpacity: 0.3,
+            spawnMinSpeed: 30.0,
+            spawnMaxSpeed: 70.0,
+            spawnMinRadius: 2.0,
+            spawnMaxRadius: 4.0,
+            particleCount: 50,
           ),
         ),
+        vsync: this,
         child: Center(
           child: FadeTransition(
-            opacity: _fade,
-            child: const LogoWidget(),
+            opacity: _animation,
+            child: ScaleTransition(
+              scale: _animation,
+              child: const LogoWidget(size: 120),
+            ),
           ),
         ),
       ),

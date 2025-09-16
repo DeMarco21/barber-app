@@ -1,348 +1,597 @@
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'client_dashboard.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:animated_background/animated_background.dart';
 
 class AdminDashboard extends StatefulWidget {
-  final List<Map<String, String>> barbers;
-  const AdminDashboard({
-    super.key,
-    this.barbers = const [], // ✅ default empty list
-  });
-
-
+  const AdminDashboard({super.key});
 
   @override
   State<AdminDashboard> createState() => _AdminDashboardScreenState();
 }
 
-class _AdminDashboardScreenState extends State<AdminDashboard> {
-  String? selectedBarberFilter;
-  String? selectedStatusFilter; // "upcoming", "completed", "cancelled"
-  DateTime? selectedDateFilter;
+class _AdminDashboardScreenState extends State<AdminDashboard> with TickerProviderStateMixin {
+  late Stream<QuerySnapshot> _usersStream;
+  String _appointmentFilter = 'Upcoming';
+  final List<String> _barbers = ['All Barbers'];
+  String _selectedBarber = 'All Barbers';
 
-  // Simulated shared appointments list
-  List<Map<String, dynamic>> appointments = [
-    {
-      "barber": "Marcus Bailey",
-      "date": DateTime.now(),
-      "time": "10:00 AM",
-      "status": "upcoming",
-      "notes": "Low fade",
-      "payment": "Cash",
-      "client": "John Smith"
-    },
-    {
-      "barber": "Shane Morgan",
-      "date": DateTime.now().subtract(const Duration(days: 2)),
-      "time": "1:00 PM",
-      "status": "completed",
-      "notes": "Beard trim",
-      "payment": "Card",
-      "client": "Alex Brown"
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _usersStream = FirebaseFirestore.instance.collection('users').snapshots();
+    _fetchBarbers();
+  }
+
+  Future<void> _fetchBarbers() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('role', isEqualTo: 'barber')
+          .get();
+      final barberNames = snapshot.docs
+          .map((doc) => (doc.data())['username'] as String)
+          .toList();
+      if (mounted) {
+        setState(() {
+          _barbers.addAll(barberNames);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorSnackBar('Failed to fetch barbers: $e');
+      }
+    }
+  }
+
+  Future<void> _updateUserRole(String uid, String newRole) async {
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(uid).update({'role': newRole});
+      _showSuccessSnackBar('User role updated successfully.');
+    } catch (e) {
+      _showErrorSnackBar('Failed to update role: $e');
+    }
+  }
+
+  Future<void> _deleteUser(String uid) async {
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(uid).delete();
+      _showSuccessSnackBar('User deleted successfully.');
+    } catch (e) {
+      _showErrorSnackBar('Failed to delete user: $e');
+    }
+  }
+
+  Future<void> _updateBarberSpecialties(String uid, List<String> specialties) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .update({'specialties': specialties});
+      _showSuccessSnackBar('Barber specialties updated.');
+    } catch (e) {
+      _showErrorSnackBar('Failed to update specialties: $e');
+    }
+  }
+
+  Future<void> _cancelAppointment(String docId) async {
+    try {
+      await FirebaseFirestore.instance.collection('appointments').doc(docId).update({'status': 'cancelled'});
+      _showSuccessSnackBar('Appointment cancelled.');
+    } catch (e) {
+      _showErrorSnackBar('Failed to cancel appointment: $e');
+    }
+  }
+
+  void _confirmCancelAppointment(BuildContext context, String docId) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Colors.grey[900],
+          title: _buildLiquidGoldTitle('Confirm Cancellation', 18),
+          content: const Text('Are you sure you want to cancel this appointment?', style: TextStyle(color: Colors.white70)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('No', style: TextStyle(color: Colors.white70)),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _cancelAppointment(docId);
+              },
+              child: const Text('Yes, Cancel', style: TextStyle(color: Colors.redAccent)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showManageSpecialtiesDialog(BuildContext context, String uid, List<dynamic> currentSpecialties) {
+    final TextEditingController specialtyController = TextEditingController();
+    List<String> specialties = List<String>.from(currentSpecialties);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              backgroundColor: Colors.grey[900],
+              title: _buildLiquidGoldTitle('Manage Specialties', 18),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (specialties.isNotEmpty)
+                      Wrap(
+                        spacing: 8.0,
+                        runSpacing: 4.0,
+                        children: specialties.map((specialty) {
+                          return Chip(
+                            label: Text(specialty),
+                            onDeleted: () {
+                              setState(() {
+                                specialties.remove(specialty);
+                              });
+                            },
+                            backgroundColor: Colors.amber,
+                            labelStyle: const TextStyle(color: Colors.black),
+                            deleteIconColor: Colors.black54,
+                          );
+                        }).toList(),
+                      )
+                    else
+                      const Text('No specialties added yet.', style: TextStyle(color: Colors.white70)),
+                    const SizedBox(height: 20),
+                    TextField(
+                      controller: specialtyController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'Add New Specialty',
+                        labelStyle: const TextStyle(color: Colors.white70),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.amber.withOpacity(0.5)),
+                        ),
+                        focusedBorder: const OutlineInputBorder(
+                          borderSide: BorderSide(color: Colors.amber),
+                        ),
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.add, color: Colors.amber),
+                          onPressed: () {
+                            final newSpecialty = specialtyController.text.trim();
+                            if (newSpecialty.isNotEmpty && !specialties.contains(newSpecialty)) {
+                              setState(() {
+                                specialties.add(newSpecialty);
+                              });
+                              specialtyController.clear();
+                            }
+                          },
+                        ),
+                      ),
+                      onSubmitted: (value) {
+                        final newSpecialty = value.trim();
+                        if (newSpecialty.isNotEmpty && !specialties.contains(newSpecialty)) {
+                          setState(() {
+                            specialties.add(newSpecialty);
+                          });
+                          specialtyController.clear();
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
+                ),
+                TextButton(
+                  onPressed: () {
+                    _updateBarberSpecialties(uid, specialties);
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Save', style: TextStyle(color: Colors.amber)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showSuccessSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(message, style: const TextStyle(color: Colors.black)),
+      backgroundColor: Colors.amber,
+    ));
+  }
+
+  void _showErrorSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(message, style: const TextStyle(color: Colors.white)),
+      backgroundColor: Colors.redAccent,
+    ));
+  }
+
+  Future<void> _signOut() async {
+    await FirebaseAuth.instance.signOut();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final filteredAppointments = appointments.where((appt) {
-      bool matches = true;
-      if (selectedBarberFilter != null &&
-          appt['barber'] != selectedBarberFilter) {
-        matches = false;
-      }
-      if (selectedStatusFilter != null &&
-          appt['status'] != selectedStatusFilter) {
-        matches = false;
-      }
-      if (selectedDateFilter != null) {
-        matches = matches &&
-            appt['date'].year == selectedDateFilter!.year &&
-            appt['date'].month == selectedDateFilter!.month &&
-            appt['date'].day == selectedDateFilter!.day;
-      }
-      return matches;
-    }).toList();
-
-    return Scaffold(
-      backgroundColor: const Color(0xFF0B0B0B),
-      appBar: AppBar(
-        backgroundColor: Colors.black,
-        title: const Text("Admin Dashboard",
-            style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold)),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.switch_account, color: Colors.amber),
-            tooltip: "Go to Client Dashboard",
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const ClientDashboard(),
-                ),
-              );
-
-            },
-          )
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            _buildFilters(),
-            const SizedBox(height: 16),
-            Expanded(
-              child: filteredAppointments.isEmpty
-                  ? const Center(
-                child: Text("No appointments found",
-                    style: TextStyle(color: Colors.white70)),
-              )
-                  : ListView.builder(
-                itemCount: filteredAppointments.length,
-                itemBuilder: (context, index) {
-                  final appt = filteredAppointments[index];
-                  return _buildAppointmentCard(appt);
-                },
-              ),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        body: AnimatedBackground(
+          behaviour: RandomParticleBehaviour(
+            options: const ParticleOptions(
+              baseColor: Color(0xFFFFD700),
+              spawnOpacity: 0.0,
+              opacityChangeRate: 0.25,
+              minOpacity: 0.1,
+              maxOpacity: 0.3,
+              particleCount: 70,
+              spawnMaxRadius: 3.0,
+              spawnMinRadius: 1.0,
+              spawnMaxSpeed: 50.0,
+              spawnMinSpeed: 10.0,
             ),
-          ],
+          ),
+          vsync: this,
+          child: NestedScrollView(
+            headerSliverBuilder: (context, innerBoxIsScrolled) {
+              return [
+                SliverAppBar(
+                  expandedHeight: 120.0,
+                  floating: true,
+                  pinned: true,
+                  backgroundColor: Colors.transparent,
+                  actions: [
+                    IconButton(
+                      icon: const Icon(Icons.logout, color: Colors.amber),
+                      onPressed: _signOut,
+                      tooltip: 'Sign Out',
+                    ),
+                  ],
+                  flexibleSpace: FlexibleSpaceBar(
+                    title: _buildLiquidGoldTitle('Admin Command', 20),
+                    titlePadding: const EdgeInsets.only(bottom: 55.0),
+                    centerTitle: true,
+                  ),
+                  bottom: TabBar(
+                    indicatorColor: Colors.amber,
+                    labelStyle: GoogleFonts.cinzel(fontWeight: FontWeight.bold),
+                    tabs: const [
+                      Tab(text: 'Appointments'),
+                      Tab(text: 'User Management'),
+                    ],
+                  ),
+                ),
+              ];
+            },
+            body: TabBarView(
+              children: [
+                _buildAppointmentsTab(),
+                _buildUsersTab(),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildFilters() {
-    return Wrap(
-      spacing: 8, // space between items horizontally
-      runSpacing: 8, // space between rows when wrapping
+  Widget _buildLiquidGoldTitle(String text, double fontSize) {
+    return ShaderMask(
+      shaderCallback: (bounds) => const LinearGradient(
+        colors: [Color(0xFFF7D780), Color(0xFFC9A24C)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ).createShader(bounds),
+      child: Text(
+        text,
+        style: GoogleFonts.cinzel(
+          fontSize: fontSize,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAppointmentsTab() {
+    return Column(
       children: [
-        // Barber Filter
-        SizedBox(
-          width: 250, // fixed width; adjust or make dynamic if needed
-          child: DropdownButtonFormField<String>(
-            dropdownColor: const Color(0xFF1C1C1C),
-            decoration: _filterDecoration("Barber"),
-            initialValue: selectedBarberFilter,
-            items: [
-              const DropdownMenuItem(
-                value: null,
-                child: Text("All", style: TextStyle(color: Colors.white)),
-              ),
-              ...widget.barbers.map((b) => DropdownMenuItem(
-                value: b["name"],
-                child: Text(
-                  b["name"]!,
-                  style: const TextStyle(color: Colors.white),
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Column(
+            children: [
+              Theme(
+                data: Theme.of(context).copyWith(
+                  canvasColor: Colors.grey[900],
                 ),
-              )),
+                child: DropdownButtonFormField<String>(
+                  value: _selectedBarber,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.amber.withOpacity(0.5)),
+                    ),
+                    focusedBorder: const OutlineInputBorder(
+                      borderSide: BorderSide(color: Colors.amber),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  ),
+                  icon: const Icon(Icons.arrow_drop_down, color: Colors.amber),
+                  items: _barbers.map((String barber) {
+                    return DropdownMenuItem<String>(
+                      value: barber,
+                      child: Text(barber, style: const TextStyle(color: Colors.white)),
+                    );
+                  }).toList(),
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      _selectedBarber = newValue!;
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8.0,
+                children: ['Upcoming', 'Completed', 'All'].map((filter) {
+                  return ChoiceChip(
+                    label: Text(filter),
+                    selected: _appointmentFilter == filter,
+                    onSelected: (selected) {
+                      if (selected) {
+                        setState(() {
+                          _appointmentFilter = filter;
+                        });
+                      }
+                    },
+                    backgroundColor: Colors.black.withOpacity(0.3),
+                    selectedColor: Colors.amber,
+                    labelStyle: TextStyle(
+                      color: _appointmentFilter == filter ? Colors.black : Colors.white,
+                    ),
+                  );
+                }).toList(),
+              ),
             ],
-            onChanged: (val) => setState(() => selectedBarberFilter = val),
           ),
         ),
+        Expanded(child: _buildAppointmentsStream()),
+      ],
+    );
+  }
 
-        // Status Filter
-        SizedBox(
-          width: 250,
-          child: DropdownButtonFormField<String>(
-            dropdownColor: const Color(0xFF1C1C1C),
-            decoration: _filterDecoration("Status"),
-            initialValue: selectedStatusFilter,
-            items: const [
-              DropdownMenuItem(
-                value: null,
-                child: Text("All", style: TextStyle(color: Colors.white)),
-              ),
-              DropdownMenuItem(
-                value: "upcoming",
-                child: Text("Upcoming", style: TextStyle(color: Colors.white)),
-              ),
-              DropdownMenuItem(
-                value: "completed",
-                child: Text("Completed", style: TextStyle(color: Colors.white)),
-              ),
-              DropdownMenuItem(
-                value: "cancelled",
-                child: Text("Cancelled", style: TextStyle(color: Colors.white)),
-              ),
-            ],
-            onChanged: (val) => setState(() => selectedStatusFilter = val),
-          ),
-        ),
+  Widget _buildAppointmentsStream() {
+    Query query = FirebaseFirestore.instance.collection('appointments').orderBy('time', descending: true);
+    if (_appointmentFilter == 'Upcoming') {
+      query = query.where('status', isEqualTo: 'upcoming');
+    } else if (_appointmentFilter == 'Completed') {
+      query = query.where('status', isEqualTo: 'completed');
+    }
 
-        // Date Picker Button
-        IconButton(
-          icon: const Icon(Icons.date_range, color: Colors.amber),
-          onPressed: () async {
-            final picked = await showDatePicker(
-              context: context,
-              initialDate: DateTime.now(),
-              firstDate: DateTime(2020),
-              lastDate: DateTime(2100),
+    if (_selectedBarber != 'All Barbers') {
+      query = query.where('barber', isEqualTo: _selectedBarber);
+    }
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: query.snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: Colors.amber));
+        }
+        if (snapshot.hasError) {
+          return Center(
+            child: Text('Something went wrong: ${snapshot.error}', style: const TextStyle(color: Colors.redAccent)),
+          );
+        }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Center(
+            child: Text('No appointments found for the selected filters.', style: TextStyle(color: Colors.white70)),
+          );
+        }
+
+        final appointments = snapshot.data!.docs;
+
+        return ListView.builder(
+          itemCount: appointments.length,
+          itemBuilder: (context, index) {
+            final doc = appointments[index];
+            final data = doc.data() as Map<String, dynamic>;
+            return _buildGlassCard(
+              child: ListTile(
+                title: Text(data['barber'] ?? 'N/A', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                subtitle: Text('''Client: ${data['client'] ?? 'N/A'}\nTime: ${data['time'] ?? 'N/A'}''', style: const TextStyle(color: Colors.white70)),
+                trailing: _buildAppointmentTrailing(doc.id, data),
+              ),
             );
-            if (picked != null) {
-              setState(() => selectedDateFilter = picked);
-            }
           },
-        ),
+        );
+      },
+    );
+  }
 
-        // Clear Date Button
-        if (selectedDateFilter != null)
-          IconButton(
-            icon: const Icon(Icons.clear, color: Colors.redAccent),
-            onPressed: () => setState(() => selectedDateFilter = null),
+  Widget _buildAppointmentTrailing(String docId, Map<String, dynamic> data) {
+    final status = data['status']?.toUpperCase() ?? 'N/A';
+    Color statusColor;
+    switch (data['status']) {
+      case 'upcoming':
+        statusColor = Colors.greenAccent;
+        break;
+      case 'completed':
+        statusColor = Colors.grey;
+        break;
+      case 'cancelled':
+        statusColor = Colors.redAccent;
+        break;
+      default:
+        statusColor = Colors.white70;
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(status, style: TextStyle(color: statusColor, fontWeight: FontWeight.bold)),
+        if (data['status'] == 'upcoming')
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: Colors.white70),
+            color: Colors.grey[800],
+            onSelected: (value) {
+              if (value == 'cancel') {
+                _confirmCancelAppointment(context, docId);
+              }
+            },
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+              const PopupMenuItem<String>(
+                value: 'cancel',
+                child: Text('Cancel Appointment', style: TextStyle(color: Colors.white)),
+              ),
+            ],
           ),
       ],
     );
   }
 
-  InputDecoration _filterDecoration(String label) {
-    return InputDecoration(
-      labelText: label,
-      labelStyle: const TextStyle(color: Colors.amber),
-      filled: true,
-      fillColor: Colors.black.withOpacity(0.4),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Colors.amber),
-      ),
-    );
-  }
+  Widget _buildUsersTab() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _usersStream,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator(color: Colors.amber));
+        }
+        if (snapshot.hasError) {
+          return const Center(
+            child: Text('Something went wrong. Check permissions?', style: TextStyle(color: Colors.redAccent)),
+          );
+        }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return const Center(
+            child: Text('No users found.', style: TextStyle(color: Colors.white70)),
+          );
+        }
 
-  Widget _buildAppointmentCard(Map<String, dynamic> appt) {
-    final dateStr =
-        "${appt['date'].day}/${appt['date'].month}/${appt['date'].year}";
-    final statusColor = appt['status'] == 'completed'
-        ? Colors.green
-        : appt['status'] == 'cancelled'
-        ? Colors.redAccent
-        : Colors.amber;
+        final users = snapshot.data!.docs;
+        final admins = users.where((doc) => (doc.data() as Map<String, dynamic>)['role'] == 'admin').toList();
+        final barbers = users.where((doc) => (doc.data() as Map<String, dynamic>)['role'] == 'barber').toList();
+        final clients = users.where((doc) {
+          final role = (doc.data() as Map<String, dynamic>)['role'];
+          return role == 'client' || role == null;
+        }).toList();
 
-    return Card(
-      color: Colors.black.withOpacity(0.4),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: statusColor,
-          child: Text(appt['barber'][0],
-              style: const TextStyle(color: Colors.black)),
-        ),
-        title: Text("${appt['barber']} • ${appt['time']}",
-            style: const TextStyle(color: Colors.white)),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        return ListView(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
           children: [
-            Text("$dateStr • ${appt['status']}",
-                style: const TextStyle(color: Colors.white70)),
-            Text("Client: ${appt['client']}",
-                style: const TextStyle(color: Colors.white54)),
-            if ((appt['notes'] ?? "").isNotEmpty)
-              Text("Notes: ${appt['notes']}",
-                  style:
-                  const TextStyle(color: Colors.white54, fontSize: 12)),
-            Text("Payment: ${appt['payment']}",
-                style: const TextStyle(color: Colors.white54, fontSize: 12)),
+            if (admins.isNotEmpty) ..._buildUserSection('Admins', admins),
+            if (barbers.isNotEmpty) ..._buildUserSection('Barbers', barbers),
+            if (clients.isNotEmpty) ..._buildUserSection('Clients', clients),
           ],
-        ),
-        trailing: PopupMenuButton<String>(
-          color: const Color(0xFF1C1C1C),
-          iconColor: Colors.amber,
-          onSelected: (value) {
-            switch (value) {
-              case 'edit':
-                _editNotes(appt);
-                break;
-              case 'cancel':
-                setState(() => appt['status'] = 'cancelled');
-                break;
-              case 'complete':
-                setState(() => appt['status'] = 'completed');
-                break;
-            }
-          },
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: 'edit',
-              child: Text("Edit notes", style: TextStyle(color: Colors.white)),
-            ),
-            if (appt['status'] == 'upcoming') ...[
-              const PopupMenuItem(
-                value: 'complete',
-                child:
-                Text("Mark completed", style: TextStyle(color: Colors.white)),
-              ),
-              const PopupMenuItem(
-                value: 'cancel',
-                child:
-                Text("Cancel appointment", style: TextStyle(color: Colors.white)),
-              ),
-            ]
-          ],
-        ),
-      ),
+        );
+      },
     );
   }
 
-  void _editNotes(Map<String, dynamic> appt) {
-    final controller = TextEditingController(text: appt['notes'] ?? "");
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: Colors.grey[900],
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: const Text("Edit Notes", style: TextStyle(color: Colors.amber)),
-        content: TextField(
-          controller: controller,
-          maxLines: 4,
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            hintText: "Update notes...",
-            hintStyle: const TextStyle(color: Colors.white54),
-            filled: true,
-            fillColor: Colors.black54,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Colors.amber),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Colors.amber),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Colors.amber, width: 2),
+  List<Widget> _buildUserSection(String title, List<QueryDocumentSnapshot> users) {
+    return [
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+        child: _buildLiquidGoldTitle('$title (${users.length})', 18),
+      ),
+      ...users.map((doc) => _buildUserCard(doc)).toList(),
+      const SizedBox(height: 10),
+    ];
+  }
+
+  Widget _buildUserCard(QueryDocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final uid = doc.id;
+    final role = data['role'] ?? 'client';
+    final specialties = data['specialties'] ?? [];
+
+    return _buildGlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ListTile(
+            title: Text(data['username'] ?? 'No Name', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            subtitle: Text(data['email'] ?? 'No Email', style: const TextStyle(color: Colors.white70)),
+            trailing: PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert, color: Colors.white70),
+              color: Colors.grey[800],
+              onSelected: (value) {
+                if (value == 'delete') {
+                  _deleteUser(uid);
+                } else if (value == 'manage_specialties') {
+                  _showManageSpecialtiesDialog(context, uid, specialties);
+                } else {
+                  _updateUserRole(uid, value);
+                }
+              },
+              itemBuilder: (BuildContext context) {
+                List<PopupMenuEntry<String>> items = [
+                  if (role != 'admin') const PopupMenuItem<String>(value: 'admin', child: Text('Make Admin', style: TextStyle(color: Colors.white))),
+                  if (role != 'barber') const PopupMenuItem<String>(value: 'barber', child: Text('Make Barber', style: TextStyle(color: Colors.white))),
+                  if (role != 'client') const PopupMenuItem<String>(value: 'client', child: Text('Make Client', style: TextStyle(color: Colors.white))),
+                  const PopupMenuDivider(),
+                  if (role == 'barber')
+                    const PopupMenuItem<String>(
+                      value: 'manage_specialties',
+                      child: Text('Manage Specialties', style: TextStyle(color: Colors.white)),
+                    ),
+                  if (role == 'barber') const PopupMenuDivider(),
+                  const PopupMenuItem<String>(
+                    value: 'delete',
+                    child: Text('Delete User', style: TextStyle(color: Colors.redAccent)),
+                  ),
+                ];
+                return items;
+              },
             ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel", style: TextStyle(color: Colors.amber)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.amber,
-              foregroundColor: Colors.black,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+          if (role == 'barber' && specialties.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: Wrap(
+                spacing: 8.0,
+                runSpacing: 4.0,
+                children: (specialties as List).map<Widget>((specialty) {
+                  return Chip(
+                    label: Text(specialty),
+                    backgroundColor: Colors.amber.withOpacity(0.7),
+                    labelStyle: const TextStyle(color: Colors.black, fontSize: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  );
+                }).toList(),
               ),
             ),
-            onPressed: () {
-              setState(() => appt['notes'] = controller.text);
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  backgroundColor: Colors.black87,
-                  content: Text(
-                    "Notes updated",
-                    style: TextStyle(color: Colors.amber),
-                  ),
-                ),
-              );
-            },
-            child: const Text("Save", style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
         ],
       ),
     );
   }
+
+  Widget _buildGlassCard({required Widget child}) {
+    return Card(
+      elevation: 4,
+      color: Colors.white.withOpacity(0.05),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15.0),
+        side: BorderSide(color: Colors.white.withOpacity(0.1), width: 1),
+      ),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: child,
+    );
   }
+}
