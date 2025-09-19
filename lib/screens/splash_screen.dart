@@ -3,12 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:animated_background/animated_background.dart';
+import 'package:google_fonts/google_fonts.dart'; // Added for font styling
 
 import 'login_screen.dart';
 import 'admin_dashboard.dart';
 import 'barber_dashboard.dart';
 import 'client_dashboard.dart';
-import '../widgets/logo_widget.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -35,6 +35,7 @@ class _SplashScreenState extends State<SplashScreen>
     );
     _controller.forward();
 
+    // The navigation logic remains untouched
     Timer(const Duration(seconds: 3), _checkAuthAndNavigate);
   }
 
@@ -97,14 +98,51 @@ class _SplashScreenState extends State<SplashScreen>
     super.dispose();
   }
 
+  // Copied directly from login_screen.dart
+  Widget _buildLogo() {
+    return Icon(
+      Icons.content_cut_rounded,
+      size: 80,
+      color: Colors.amber,
+      shadows: [
+        Shadow(
+          color: Colors.amber.withOpacity(0.8),
+          blurRadius: 15,
+        ),
+      ],
+    );
+  }
+
+  // Copied directly from login_screen.dart
+  Widget _buildTitle() {
+    return ShaderMask(
+      shaderCallback: (bounds) => const LinearGradient(
+        colors: [Color(0xFFFFD700), Color(0xFFFFA500), Color(0xFFFF4500)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ).createShader(bounds),
+      child: Text(
+        'TrimCraft',
+        textAlign: TextAlign.center,
+        style: GoogleFonts.cinzel(
+          fontSize: 48,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+          letterSpacing: 1.5,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
       body: AnimatedBackground(
+        // The particle background animation remains
         behaviour: RandomParticleBehaviour(
           options: const ParticleOptions(
-            baseColor: Color(0xFFC98633), // Gold
+            baseColor: Color(0xFFC98633),
             spawnOpacity: 0.0,
             opacityChangeRate: 0.25,
             minOpacity: 0.1,
@@ -122,7 +160,14 @@ class _SplashScreenState extends State<SplashScreen>
             opacity: _animation,
             child: ScaleTransition(
               scale: _animation,
-              child: const LogoWidget(size: 120),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildLogo(),
+                  const SizedBox(height: 20),
+                  _buildTitle(),
+                ],
+              ),
             ),
           ),
         ),

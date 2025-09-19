@@ -1,4 +1,4 @@
-import 'package:barber/screens/auth_wrapper.dart';
+import 'package:barber/screens/splash_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'core/theme.dart';
@@ -24,7 +24,7 @@ class BarberApp extends StatelessWidget {
     return MaterialApp(
       title: 'TrimCraft',
       theme: AppTheme.light,
-      home: const AuthWrapper(), // We now use the AuthWrapper
+      home: const SplashScreen(), // Set SplashScreen as the home
       debugShowCheckedModeBanner: false,
     );
   }

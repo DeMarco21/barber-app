@@ -5,6 +5,12 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'dart:math' as math;
+import 'dart:ui';
+import 'package:barber/widgets/glass_container.dart';
+
+import 'admin_dashboard.dart';
+import 'barber_dashboard.dart';
+import 'client_dashboard.dart';
 
 // The main widget
 class LoginScreen extends StatefulWidget {
@@ -58,13 +64,14 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     });
 
     try {
+      UserCredential userCredential;
       if (_isLoginView) {
-        await FirebaseAuth.instance.signInWithEmailAndPassword(
+        userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
       } else {
-        UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
@@ -75,7 +82,29 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           'createdAt': FieldValue.serverTimestamp(),
         });
       }
-      // AuthWrapper will handle navigation
+
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).get();
+      final role = userDoc.data()?['role'] ?? 'client';
+
+      if (!mounted) return;
+
+      switch (role) {
+        case 'admin':
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const AdminDashboard()),
+          );
+          break;
+        case 'barber':
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const BarberDashboard()),
+          );
+          break;
+        default:
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const ClientDashboard()),
+          );
+      }
+
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -98,7 +127,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     try {
       final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
       if (googleUser == null) {
-        // The user canceled the sign-in
         if (mounted) setState(() => _isLoading = false);
         return;
       }
@@ -111,6 +139,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
       final userDoc = FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid);
       final docSnapshot = await userDoc.get();
+      String role = 'client';
 
       if (!docSnapshot.exists) {
         String username = googleUser.displayName?.split(' ').first ?? 'User';
@@ -120,6 +149,27 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           'role': 'client',
           'createdAt': FieldValue.serverTimestamp(),
         });
+      } else {
+        role = docSnapshot.data()?['role'] ?? 'client';
+      }
+
+      if (!mounted) return;
+
+      switch (role) {
+        case 'admin':
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const AdminDashboard()),
+          );
+          break;
+        case 'barber':
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const BarberDashboard()),
+          );
+          break;
+        default:
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const ClientDashboard()),
+          );
       }
       // AuthWrapper will handle navigation
     } on FirebaseAuthException catch (e) {
@@ -139,6 +189,102 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         });
       }
     }
+  }
+
+  Future<void> _sendPasswordResetEmail(String email) async {
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your email address.'), backgroundColor: Colors.redAccent),
+      );
+      return;
+    }
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Password reset email sent to $email')),
+      );
+    } on FirebaseAuthException catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message ?? 'An error occurred'), backgroundColor: Colors.redAccent),
+      );
+    }
+  }
+
+  void _showForgotPasswordDialog() {
+    final TextEditingController emailController = TextEditingController();
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (context) {
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: AlertDialog(
+            backgroundColor: Colors.transparent,
+            content: GlassContainer(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Reset Password',
+                    style: GoogleFonts.inter(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  TextFormField(
+                    controller: emailController,
+                    decoration: _inputDecoration('Email', Icons.alternate_email_rounded),
+                    style: const TextStyle(color: Colors.white),
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('Cancel'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            _sendPasswordResetEmail(emailController.text.trim());
+                            Navigator.of(context).pop();
+                          },
+                          child: const Text('Send'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildForgotPasswordButton() {
+    return Container(
+      alignment: Alignment.centerRight,
+      child: TextButton(
+        onPressed: _showForgotPasswordDialog,
+        child: Text(
+          'Forgot Password?',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.6),
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -170,6 +316,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                 _buildEmailField(),
                 const SizedBox(height: 20),
                 _buildPasswordField(),
+                if (_isLoginView) _buildForgotPasswordButton(),
                 if (_errorMessage != null) ...[
                   const SizedBox(height: 15),
                   Text(
